@@ -1,3 +1,5 @@
 *.iml
 .DS_Store
 build
+node_modules
+src-es5

@@ -9,8 +9,6 @@ BUILD_DIR="/Users/akli/own/workspace/pebble/pebble-build"
 PEBBLEJS_DIR="/Users/akli/own/workspace/pebble/pebblejs"
 CURRENT_DIR=`pwd`
 
-
-
 # create/clean build directory
 if [ -d $BUILD_DIR ]; then
     echo -e "${BLUE}--> Clear build directory${NC}"
@@ -20,11 +18,16 @@ else
     mkdir $BUILD_DIR
 fi
 
+# transpiling sources
+echo -e "${BLUE}--> Transpiling sources${NC}"
+npm run build
+
 # copy files
 echo -e "${BLUE}--> Copy Pebble.js files${NC}"
 rsync -av -q $PEBBLEJS_DIR/ $BUILD_DIR/ --exclude .git
 echo -e "${BLUE}--> Copy project files${NC}"
-rsync -av -q ./ $BUILD_DIR/ --exclude .git
+rsync -av -q ./src-es5/ $BUILD_DIR/src/
+rsync -av -q ./ $BUILD_DIR/ --exclude .git --exclude src --exclude src-es5 --exclude node_modules --exclude package.json
 
 cd $BUILD_DIR
 
