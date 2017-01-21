@@ -1,0 +1,69 @@
+{
+  "appKeys": {},
+  "capabilities": [
+    "configurable",
+    "location"
+  ],
+  "companyName": "aklotos",
+  "longName": "Minsk transport",
+  "resources": {
+    "media": [
+      {
+        "file": "images/logo_splash.png",
+        "name": "IMAGE_LOGO_SPLASH",
+        "type": "bitmap"
+      },
+      {
+        "file": "images/tile_splash.png",
+        "name": "IMAGE_TILE_SPLASH",
+        "type": "bitmap"
+      },
+      {
+        "file": "images/bus.png",
+        "menuIcon": true,
+        "name": "BUS_ICON",
+        "type": "bitmap"
+      },
+      {
+        "file": "images/refresh.png",
+        "name": "REFRESH_ICON",
+        "type": "bitmap"
+      },
+      {
+        "file": "images/configure.png",
+        "name": "CONFIGURE_ICON",
+        "type": "bitmap"
+      },
+      {
+        "file": "images/heart.png",
+        "name": "HEART_ICON",
+        "type": "bitmap"
+      },
+      {
+        "file": "images/gps.png",
+        "name": "GPS_ICON",
+        "type": "bitmap"
+      },
+      {
+        "file": "fonts/UbuntuMono-Regular.ttf",
+        "name": "MONO_FONT_14",
+        "type": "font"
+      }
+    ]
+  },
+  "sdkVersion": "3",
+  "shortName": "Minsk transport",
+  "targetPlatforms": [
+    "aplite",
+    "basalt",
+    "chalk",
+    "diorite",
+    "emery"
+  ],
+  "uuid": "133215f0-cf20-4c05-997b-3c9be5a64e5b",
+  "versionCode": 1,
+  "versionLabel": "0.4",
+  "watchapp": {
+    "watchface": false
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "favourites": [
+    {
+      "id": 3958789,
+      "name": "просп. газ. Звезда",
+      "description": "T53,A23,A28"
+    },
+    {
+      "id": 9624,
+      "name": "просп. газ. Звезда",
+      "description": "T36"
+    },
+    {
+      "id": 51072,
+      "name": "ст. м. Михалово",
+      "description": "T36"
+    },
+    {
+      "id": 46213,
+      "name": "ст. м. Михалово",
+      "description": "T53"
+    },
+    {
+      "id": 46237,
+      "name": "ул. Гурского",
+      "description": "T7,T9"
+    },
+    {
+      "id": 51116,
+      "name": "ул. Гурского",
+      "description": "A23,A28"
+    },
+    {
+      "id": 2419,
+      "name": "ул. Пинская",
+      "description": "->ст.м. Пушкинская"
+    },
+    {
+      "id": 56726,
+      "name": "ул. Пинская",
+      "description": "->ст.м. Молодежная"
+    },
+    {
+      "id": 46208,
+      "name": "ул. Бельского",
+      "description": "Т7,Т9"
+    },
+    {
+      "id": 46084,
+      "name": "ул. Одоевского",
+      "description": "Т4"
+    }
+  ],
+  "api": {
+    "url": {
+      "schedule": "http://ts-transport-schedule.44fs.preview.openshiftapps.com/stop/:stopId/schedule/nearest?retry=:maxRetry"
+    }
+  },
+  "updateInterval": 15000,
+  "updateIntervalOnFail": 5000,
+  "maxDistance": 500,
+  "maxRetry": 5,
+  "notificationFadeTimeout": 7000
+}

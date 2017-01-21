@@ -1,0 +1,44 @@
+{
+  "favourites": [
+    {
+      "id": 3958789,
+      "name": "просп. газ. Звезда",
+      "description": "T53,A23,A28"
+    },
+    {
+      "id": 9624,
+      "name": "просп. газ. Звезда",
+      "description": "T36"
+    },
+    {
+      "id": 51072,
+      "name": "ст. м. Михалово",
+      "description": "T36"
+    },
+    {
+      "id": 46213,
+      "name": "ст. м. Михалово",
+      "description": "T53"
+    },
+    {
+      "id": 2365,
+      "name": "ст.м.Московская",
+      "description": "A64,A25,A145"
+    },
+    {
+      "id": 2494,
+      "name": "Академгородок",
+      "description": "A64,A25,A145"
+    }
+  ],
+  "api": {
+    "url": {
+      "schedule": "http://ts-transport-schedule.44fs.preview.openshiftapps.com/stop/:stopId/schedule/nearest?retry=:maxRetry"
+    }
+  },
+  "updateInterval": 15000,
+  "updateIntervalOnFail": 5000,
+  "maxDistance": 500,
+  "maxRetry": 5,
+  "notificationFadeTimeout": 7000
+}
