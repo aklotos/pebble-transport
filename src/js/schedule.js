@@ -1,27 +1,31 @@
+'use strict';
+
 const UI = require('ui');
 const ajax = require('ajax');
-const util = require('util2');
 const clock = require('clock');
 const moment = require('moment');
 const Vector2 = require('vector2');
-const config = require('./config');
 const vibe = require('ui/vibe');
 const light = require('ui/light');
+const config = require('./config');
+const log = require('./log');
 
 const MAX_SUBSEQUENT_ATTEMPTS = 5;
+const SCHEDULE_START_POS_Y = 36;
+const SCHEDULE_FONT_SIZE_BIG = 18;
+const SCHEDULE_FONT_SIZE_SMALL = 14;
 
-var scheduleWindow;
-var stopTitle;
-var scheduleInfo;
-var routesInfo;
-var notifyInfo;
+let scheduleWindow;
+let stopTitle;
+let scheduleInfo = [];
+let notifyInfo;
 
-var updateTimeout;
-var routes = [];
-var following = [];
-var currentMin = {};
-var updateFunc;
-var attempt = 0;
+let updateTimeout;
+let routes = [];
+let following = [];
+let previousNext = {};
+let updateFunc;
+let attempt = 0;
 
 module.exports.showSchedule = function (stopId) {
     scheduleWindow = new UI.Window({
@@ -29,89 +33,105 @@ module.exports.showSchedule = function (stopId) {
         clear: true,
         backgroundColor: 'white'
     });
+    scheduleWindow.customName = 'schedule window';
 
     stopTitle = stopTitleText();
-    scheduleInfo = scheduleInfoText();
-    routesInfo = routesInfoText();
     notifyInfo = notifyInfoText();
 
     scheduleWindow.status(true);
     scheduleWindow.add(stopTitle);
-    scheduleWindow.add(scheduleInfo);
-    scheduleWindow.add(routesInfo);
     scheduleWindow.show();
 
     scheduleWindow.on('click', 'select', function () {
-        console.log('selected!');
+        console.log('Select clicked: updating schedule');
         updateFunc();
     });
 
-    scheduleWindow.on('longClick', 'select', function () {
+    scheduleWindow.on('longClick', 'select', () => {
         const routesMenu = new UI.Menu({
             sections: [{
-                items: routes.map(function (r) {
-                    return {title: r + (~following.indexOf(r) ? ' +' : ''), id: r, follow: ~following.indexOf(r) };
-                })
+                items: routes.map(r => ({
+                    title: `${r.route} ${~following.indexOf(r.route) ? '+' : ''}`,
+                    subtitle: r.endStop,
+                    id: r.route,
+                    follow: ~following.indexOf(r.route)
+                }))
             }]
         });
         routesMenu.show();
 
-        routesMenu.on('select', function (e) {
+        routesMenu.on('select', e => {
             console.log('Selected stop to follow/unfollow: ', e.item.id);
 
             routesMenu.item(e.sectionIndex, e.itemIndex, {
                 id: e.item.id,
-                title: e.item.id + (e.item.follow ? '' : ' +'),
+                title: `${e.item.id} ${e.item.follow ? '' : '+'}`,
+                subtitle: e.item.subtitle,
                 follow: !e.item.follow
             });
         });
 
-        routesMenu.on('hide', function () {
-            following = routesMenu._getSection({sectionIndex: 0}).items.filter(function (item) {
-                return item.follow;
-            }).map(function (item) {
-                return item.id;
-            });
-            console.log('following routes: ', following);
+        routesMenu.on('hide', () => {
+            following = routesMenu._getSection({sectionIndex: 0}).items
+                .filter(item => item.follow)
+                .map(item => item.id);
+            console.log('Routes to follow: ', following);
+
             updateWithTimeout(updateFunc, config.updateInterval);
         })
     });
 
-    scheduleWindow.on('hide', function () {
-        console.log('Clear timeout');
+    scheduleWindow.on('hide', () => {
+        console.log('Hide window: clear timeout, clear previousNext');
         clearTimeout(updateTimeout);
-        currentMin = {};
+        previousNext = {};
     });
 
     updateFunc = function (refresh) {
         ajax({
             url: config.api.url.schedule.replace(':stopId', stopId).replace(':maxRetry', config.maxRetry),
-            type: 'json',
+            type: 'json'
         }, function (data) {
+
             attempt = 0;
-            console.log('updated: ', moment().format('HH:mm:ss'));
+            const preprocessedData = preprocess(data);
+            console.log(`schedule updated: ${now()}`);
 
-            stopTitle.text(stopTitleContent(data));
-            scheduleInfo.text(scheduleDataContent(data));
-            routesInfo.text(routesDataContent(data));
+            // extract all non park routes (used in menu of following transport)
+            updateRoutes(preprocessedData);
 
-            updateRoutes(data);
+            // update title
+            stopTitle.text(`${now()}: ${data.StopName}`);
+
+            // update schedule content:
+            // 1. Clear old schedule elements
+            scheduleInfo.forEach(text => scheduleWindow.remove(text));
+            scheduleInfo = [];
+            // 2. Create new schedule elements
+            const textLines = scheduleTextLines(preprocessedData);
+            let pos = SCHEDULE_START_POS_Y;
+            textLines.forEach(e => {
+                const size = e.bold ? SCHEDULE_FONT_SIZE_BIG : SCHEDULE_FONT_SIZE_SMALL;
+                scheduleInfo.push(scheduleInfoText(pos, size, e.bold, e.title));
+                pos += size;
+            });
+            // 3. Add new schedule elements
+            scheduleInfo.forEach(text => scheduleWindow.add(text));
+
             if (following.length > 0) {
-                console.log('Looking for nearest from following...');
+                console.log('Looking for nearest transport from following');
 
-                var min = findFollowingMin(data);
-                console.log('Current nearest: ', util.toString(currentMin));
-                console.log('Found nearest: ', util.toString(min));
+                let next = findNextFromFollowing(preprocessedData);
+                console.log(`Previous nearest: ${previousNext.route}:${previousNext.time}, current nearest: ${next.route}:${next.time}`);
 
-                if (min.route && min.time && !(currentMin.route === min.route && currentMin.time === min.time)) {
-                    console.log('vibro & light!');
+                if (next.route && !dirtyEquals(previousNext, next)) {
+                    previousNext = next;
 
-                    currentMin = min;
-
+                    console.log('notification: vibro & light!');
                     vibe.vibrate('short');
                     light.trigger();
 
-                    notifyInfo.text(notificationTextContent(currentMin));
+                    notifyInfo.text(notificationTextContent(next));
                     showNotification(config.notificationFadeTimeout);
                 }
             }
@@ -120,21 +140,23 @@ module.exports.showSchedule = function (stopId) {
                 updateWithTimeout(updateFunc, config.updateInterval);
             }
         }, function scheduleErrorCallback(err) {
+            console.log('error: ', err);
+
             if (!err && attempt < MAX_SUBSEQUENT_ATTEMPTS) {
                 attempt++;
-                console.log('FAILED ATTEMPT #', attempt);
 
+                console.log('FAILED ATTEMPT #', attempt);
                 return updateFunc(refresh);
             }
 
-            const subtitle = err && err.error ? 'Minsktrans fail' : 'Proxy or app fail';
-            const body = err && err.error ? JSON.stringify(err.error) : 'Please, check your internet connection and make sure proxy server is alive';
+            const subtitle = err && err.error ? 'Minsktrans fail' : 'Fail';
+            const body = err ? log(err) : 'Please, check your internet connection and make sure proxy server is alive';
             const errCard = errorCard('Error loading schedule', subtitle, body);
             errCard.show();
 
             if (refresh) {
                 console.log('Error occurred: updating with timeout');
-                updateWithTimeout(function(refresh) {
+                updateWithTimeout(function (refresh) {
                     errCard.hide();
                     updateFunc(refresh);
                 }, config.updateIntervalOnFail);
@@ -152,105 +174,108 @@ function updateWithTimeout(fn, timeout) {
 
 function showNotification(timeout) {
     scheduleWindow.add(notifyInfo);
-    scheduleWindow.remove(scheduleInfo);
+    scheduleInfo.forEach(scheduleWindow.remove.bind(scheduleWindow));
     setTimeout(function () {
         scheduleWindow.remove(notifyInfo);
-        scheduleWindow.add(scheduleInfo);
+        scheduleInfo.forEach(scheduleWindow.add.bind(scheduleWindow));
     }, timeout);
 }
 
 function notificationTextContent(min) {
-    return min.route.replace('А', 'A').replace('Т', 'T').replace('с', 'c').replace('а', 'a') + ': ' + min.time;
+    const route = min.route.replace('А', 'A').replace('Т', 'T').replace('с', 'c').replace('а', 'a');
+    return `${route}: ${min.time}`;
 }
 
-function stopTitleContent(data) {
-    const now = moment().format('HH:mm:ss');
-    return now + ': ' + data.StopName;
+function now() {
+    return moment().format('HH:mm:ss');
 }
 
 function updateRoutes(data) {
-    routes = [];
-    data.Routes.forEach(function(r) {
-        if (!~r.EndStop.indexOf('Троллейбусный парк')) {
-            routes.push(r.Type + r.Number);
-        }
-    });
+    routes = data.filter(r => !r.park).map(r => ({route: r.route, endStop: r.endStop}));
 }
 
-function findFollowingMin(data) {
-    var min = {};
-    data.Routes.forEach(function(r) {
-        if (!~r.EndStop.indexOf('Троллейбусный парк')) {
-            if (following.indexOf(r.Type + r.Number) !== -1 && (!min.route || compareTimes(min.time, r.Info[0]) > 0)) {
-                console.log('min from: ', r.Type + r.Number);
-                min = {route: r.Type + r.Number, time: r.Info[0]};
-            }
+function findNextFromFollowing(preprocessedData) {
+    let min = {};
+    preprocessedData.forEach(r => {
+        if (!r.park && ~following.indexOf(r.route) && (!min.time || r.next < min.intTime)) {
+            console.log(`Trying to find next: route = ${r.route}, schedule = ${r.schedule}`);
+            console.log('before: ', min.intTime, 'now: ', r.next);
+            min = {
+                route: r.route,
+                time: r.schedule[0],
+                intTime: r.next
+            };
         }
     });
     return min;
 }
 
-function compareTimes(t1, t2) {
-    if (t1 === t2) {
-        return 0;
-    } else {
-        const parseTime = function (t) {
-            return parseInt(
-                t.replace('-', '1000')
-                .replace('D', '100')
-                .replace('<1', '0')
-                .replace('A', '-1')
-            );
-        };
-        return parseTime(t1) - parseTime(t2);
+function preprocess(data) {
+    const preprocessed = [];
+    data.Routes.forEach(r => {
+        const toPark = ~r.EndStop.indexOf('Троллейбусный парк');
+        preprocessed.push({
+            route: r.Type + r.Number,
+            park: toPark,
+            schedule: r.Info,
+            next: parseInt(r.Info[0].replace('-', '1000').replace('D', '100').replace('<1', '0').replace('A', '-1')),
+            endStop: r.EndStop.replace('Троллейбусный парк', 'ТП').replace('№', 'N')
+        });
+    });
+    preprocessed.sort((e1, e2) => {
+        const next1 = e1.next + (e1.park ? 10000 : 0);
+        const next2 = e2.next + (e2.park ? 10000 : 0);
+        return next1 - next2;
+    });
+
+    return preprocessed;
+}
+
+function scheduleTextLines(preprocessedData) {
+    const elements = [];
+    preprocessedData.forEach(e => {
+        if (e.park) {
+            elements.push({title: `${e.route} [${e.endStop}]: ${e.schedule.join(',')}`, bold: false});
+        } else {
+            elements.push({title: `${e.route}: ${e.schedule.join(',')}`, bold: true});
+            elements.push({title: `${e.endStop}`, bold: false});
+        }
+    });
+    return elements;
+}
+
+function dirtyEquals(obj1, obj2) {
+    for (let prop in obj1) {
+        if (obj1[prop] !== obj2[prop]) {
+            return false;
+        }
     }
-}
-
-function scheduleDataContent(data) {
-    return data.Routes.map(function (r) {
-        if (~r.EndStop.indexOf('Троллейбусный парк')) {
-            const endStop = r.EndStop.replace('Троллейбусный парк', 'ТП').replace('№', 'N');
-            return r.Type + r.Number + ' [' + endStop + ']: ' + r.Info.join(',');
+    for (let prop in obj2) {
+        if (obj1[prop] !== obj2[prop]) {
+            return false;
         }
-        return r.Type + r.Number + ': ' + r.Info.join(',');
-    }).join('\n');
-}
-
-function routesDataContent(data) {
-    const routesInfo = data.Routes.map(function (r) {
-        if (r.EndStop.indexOf('Троллейбусный парк')) {
-            return r.Type + r.Number + ': ' + r.EndStop;
-        }
-    }).filter(function(r) { return r; }).join('\n');
-
-    return '----------------------\n' + routesInfo;
+    }
+    return true;
 }
 
 function stopTitleText() {
     return new UI.Text({
         position: new Vector2(0, 0),
-        size: new Vector2(144, 40),
+        size: new Vector2(144, SCHEDULE_START_POS_Y),
         font: 'gothic-18-bold',
         color: 'black',
         textOverflow: 'ellipsis'
     });
 }
 
-function scheduleInfoText() {
+function scheduleInfoText(yPos, size, bold, text) {
     return new UI.Text({
-        position: new Vector2(0, 40),
-        size: new Vector2(144, 200),
-        font: 'gothic-18-bold',
-        color: 'black'
-    });
-}
-
-function routesInfoText() {
-    return new UI.Text({
-        position: new Vector2(0, 240),
-        size: new Vector2(110, 200),
-        font: 'gothic-14',
-        color: 'black'
+        position: new Vector2(0, yPos),
+        size: new Vector2(144, size),
+        font: bold ? `gothic-${size}-bold` : `gothic-${size}`,
+        color: 'black',
+        text: text,
+        textAlign: 'left'
     });
 }
 
@@ -259,7 +284,8 @@ function notifyInfoText() {
         position: new Vector2(0, 50),
         size: new Vector2(144, 128),
         font: 'bitham-42-bold',
-        color: 'black'
+        color: 'black',
+        textAlign: 'center'
     });
 }
 

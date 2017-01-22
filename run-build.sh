@@ -20,6 +20,7 @@ fi
 
 # transpiling sources
 echo -e "${BLUE}--> Transpiling sources${NC}"
+rm -rf src-es5
 npm run build
 
 # copy files

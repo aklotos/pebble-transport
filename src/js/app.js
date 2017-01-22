@@ -1,11 +1,11 @@
-var UI = require('ui');
-var favourites = require('./favourites');
-var nearest = require('./nearest');
+const UI = require('ui');
+const favourites = require('./favourites');
+const nearest = require('./nearest');
 
-var ID_FAVOURITES = 'FAVOURITES';
-var ID_NEAREST = 'NEAREST';
+const ID_FAVOURITES = 'FAVOURITES';
+const ID_NEAREST = 'NEAREST';
 
-var mainMenu = new UI.Menu({
+const mainMenu = new UI.Menu({
     sections: [{
         items: [
             {
@@ -22,7 +22,7 @@ var mainMenu = new UI.Menu({
     }]
 });
 
-mainMenu.on('select', function (e) {
+mainMenu.on('select', e => {
     switch (e.item.id) {
         case ID_FAVOURITES: {
             favourites.showFavourites();

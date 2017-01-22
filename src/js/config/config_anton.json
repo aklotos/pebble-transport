@@ -53,7 +53,7 @@
   ],
   "api": {
     "url": {
-      "schedule": "http://ts-transport-schedule.44fs.preview.openshiftapps.com/stop/:stopId/schedule/nearest?retry=:maxRetry"
+      "schedule": "https://transport-schedule.herokuapp.com/stop/:stopId/schedule/nearest?retry=:maxRetry"
     }
   },
   "updateInterval": 15000,
