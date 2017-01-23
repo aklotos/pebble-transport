@@ -17,7 +17,7 @@ const SCHEDULE_FONT_SIZE_SMALL = 14;
 
 let scheduleWindow;
 let stopTitle;
-let scheduleInfo = [];
+let scheduleInfo = {regular: [], park: {count: 0}};
 let notifyInfo;
 
 let updateTimeout;
@@ -94,34 +94,32 @@ module.exports.showSchedule = function (stopId) {
         }, function (data) {
 
             attempt = 0;
-            const preprocessedData = preprocess(data);
+            const preprocessed = preprocess(data);
             console.log(`schedule updated: ${now()}`);
 
             // extract all non park routes (used in menu of following transport)
-            updateRoutes(preprocessedData);
+            updateRoutes(preprocessed.data);
 
             // update title
             stopTitle.text(`${now()}: ${data.StopName}`);
 
-            // update schedule content:
-            // 1. Clear old schedule elements
-            scheduleInfo.forEach(text => scheduleWindow.remove(text));
-            scheduleInfo = [];
-            // 2. Create new schedule elements
-            const textLines = scheduleTextLines(preprocessedData);
-            let pos = SCHEDULE_START_POS_Y;
-            textLines.forEach(e => {
-                const size = e.bold ? SCHEDULE_FONT_SIZE_BIG : SCHEDULE_FONT_SIZE_SMALL;
-                scheduleInfo.push(scheduleInfoText(pos, size, e.bold, e.title));
-                pos += size;
-            });
-            // 3. Add new schedule elements
-            scheduleInfo.forEach(text => scheduleWindow.add(text));
+            // update schedule info skeleton
+            craftScheduleInfoSkeleton(preprocessed);
+            // update schedule info content
+            const textLines = scheduleTextLines(preprocessed.data);
+            for (let i = 0; i < textLines.regular.length; i++) {
+                scheduleInfo.regular[i].schedule.text(textLines.regular[i].schedule);
+                scheduleInfo.regular[i].endStop.text(textLines.regular[i].endStop);
+            }
+            if (scheduleInfo.park.text) {
+                scheduleInfo.park.text.text(textLines.park);
+            }
 
+            // find next from following and notify if changed
             if (following.length > 0) {
                 console.log('Looking for nearest transport from following');
 
-                let next = findNextFromFollowing(preprocessedData);
+                let next = findNextFromFollowing(preprocessed.data);
                 console.log(`Previous nearest: ${previousNext.route}:${previousNext.time}, current nearest: ${next.route}:${next.time}`);
 
                 if (next.route && !dirtyEquals(previousNext, next)) {
@@ -174,10 +172,10 @@ function updateWithTimeout(fn, timeout) {
 
 function showNotification(timeout) {
     scheduleWindow.add(notifyInfo);
-    scheduleInfo.forEach(scheduleWindow.remove.bind(scheduleWindow));
+    clearScheduleInfoSkeleton(true);
     setTimeout(function () {
         scheduleWindow.remove(notifyInfo);
-        scheduleInfo.forEach(scheduleWindow.add.bind(scheduleWindow));
+        showScheduleInfoSkeleton(true);
     }, timeout);
 }
 
@@ -198,8 +196,6 @@ function findNextFromFollowing(preprocessedData) {
     let min = {};
     preprocessedData.forEach(r => {
         if (!r.park && ~following.indexOf(r.route) && (!min.time || r.next < min.intTime)) {
-            console.log(`Trying to find next: route = ${r.route}, schedule = ${r.schedule}`);
-            console.log('before: ', min.intTime, 'now: ', r.next);
             min = {
                 route: r.route,
                 time: r.schedule[0],
@@ -212,8 +208,10 @@ function findNextFromFollowing(preprocessedData) {
 
 function preprocess(data) {
     const preprocessed = [];
+    const count = {regular: 0, park: 0};
     data.Routes.forEach(r => {
         const toPark = ~r.EndStop.indexOf('Троллейбусный парк');
+        toPark ? count.park++ : count.regular++;
         preprocessed.push({
             route: r.Type + r.Number,
             park: toPark,
@@ -228,19 +226,88 @@ function preprocess(data) {
         return next1 - next2;
     });
 
-    return preprocessed;
+    return {data: preprocessed, count};
+}
+
+function clearScheduleInfoSkeleton(alterRegular) {
+    if (scheduleInfo.regular.length > 0 || scheduleInfo.park.count > 0) {
+        console.log('Clear schedule info text fields skeleton');
+        if (alterRegular) {
+            scheduleInfo.regular.forEach(r => {
+                scheduleWindow.remove(r.schedule);
+                scheduleWindow.remove(r.endStop);
+            });
+        }
+        scheduleWindow.remove(scheduleInfo.park.text);
+    }
+}
+
+function createNewScheduleInfoModel(preprocessed, alterRegular) {
+    console.log(`Creating new schedule info text fields skeleton: ${preprocessed.count.regular} regular routes, ${preprocessed.count.park} routes in park`);
+
+    const FSMALL = SCHEDULE_FONT_SIZE_SMALL;
+    const FBIG = SCHEDULE_FONT_SIZE_BIG;
+    const padding = 4;
+
+    let pos = SCHEDULE_START_POS_Y;
+    for (let i = 0; i < preprocessed.count.regular; i++) {
+        if (alterRegular) {
+            scheduleInfo.regular.push({
+                schedule: scheduleInfoText(pos, FBIG, FBIG, true),
+                endStop: scheduleInfoText(pos + FBIG, FSMALL, FSMALL, false)
+            });
+        }
+        pos += FBIG + FSMALL;
+    }
+    scheduleInfo.park.count = preprocessed.count.park;
+    scheduleInfo.park.text = scheduleInfoText(pos, FSMALL, FSMALL * preprocessed.count.park + padding, false);
+}
+
+function showScheduleInfoSkeleton(alterRegular) {
+    console.log('Show schedule info text fields skeleton');
+    if (alterRegular) {
+        scheduleInfo.regular.forEach(r => {
+            scheduleWindow.add(r.schedule);
+            scheduleWindow.add(r.endStop);
+        });
+    }
+    scheduleWindow.add(scheduleInfo.park.text);
+}
+
+function clearScheduleInfoModel(alterRegular) {
+    console.log('Clear schedule info model');
+    if (alterRegular) {
+        scheduleInfo.regular = [];
+    }
+    scheduleInfo.park = {count: 0};
+}
+
+function craftScheduleInfoSkeleton(preprocessed) {
+    if (preprocessed.count.regular === scheduleInfo.regular.length && preprocessed.count.park === scheduleInfo.park.count) {
+        return;
+    }
+
+    const alterRegular = preprocessed.count.regular !== scheduleInfo.regular.length;
+    clearScheduleInfoSkeleton(alterRegular);
+    clearScheduleInfoModel(alterRegular);
+    createNewScheduleInfoModel(preprocessed, alterRegular);
+    showScheduleInfoSkeleton(alterRegular);
 }
 
 function scheduleTextLines(preprocessedData) {
-    const elements = [];
+    const elements = {regular: []};
+    const parkLines = [];
     preprocessedData.forEach(e => {
         if (e.park) {
-            elements.push({title: `${e.route} [${e.endStop}]: ${e.schedule.join(',')}`, bold: false});
+            parkLines.push(`${e.route} [${e.endStop}]: ${e.schedule.join(',')}`);
         } else {
-            elements.push({title: `${e.route}: ${e.schedule.join(',')}`, bold: true});
-            elements.push({title: `${e.endStop}`, bold: false});
+            elements.regular.push({
+                schedule: `${e.route}: ${e.schedule.join(',')}`,
+                endStop: `${e.endStop}`
+            });
         }
     });
+    elements.park = parkLines.join('\n');
     return elements;
 }
 
@@ -268,13 +335,12 @@ function stopTitleText() {
     });
 }
 
-function scheduleInfoText(yPos, size, bold, text) {
+function scheduleInfoText(yPos, fontSize, elementSize, bold) {
     return new UI.Text({
         position: new Vector2(0, yPos),
-        size: new Vector2(144, size),
-        font: bold ? `gothic-${size}-bold` : `gothic-${size}`,
+        size: new Vector2(144, elementSize),
+        font: bold ? `gothic-${fontSize}-bold` : `gothic-${fontSize}`,
         color: 'black',
-        text: text,
         textAlign: 'left'
     });
 }
