@@ -19,6 +19,7 @@ let scheduleWindow;
 let stopTitle;
 let scheduleInfo = {regular: [], park: {count: 0}};
 let notifyInfo;
+let notifyBackground = notifyInfoBackgroundRect();
 
 let updateTimeout;
 let routes = [];
@@ -129,8 +130,7 @@ module.exports.showSchedule = function (stopId) {
                     vibe.vibrate('short');
                     light.trigger();
 
-                    notifyInfo.text(notificationTextContent(next));
-                    showNotification(config.notificationFadeTimeout);
+                    showNotification(next, config.notificationFadeTimeout);
                 }
             }
 
@@ -170,18 +170,21 @@ function updateWithTimeout(fn, timeout) {
     }, timeout);
 }
 
-function showNotification(timeout) {
+function showNotification(next, timeout) {
+    scheduleWindow.add(notifyBackground);
+    notifyInfo.text(notificationTextContent(next));
     scheduleWindow.add(notifyInfo);
-    clearScheduleInfoSkeleton(true);
     setTimeout(function () {
         scheduleWindow.remove(notifyInfo);
-        showScheduleInfoSkeleton(true);
+        scheduleWindow.remove(notifyBackground);
     }, timeout);
 }
 
 function notificationTextContent(min) {
     const route = min.route.replace('А', 'A').replace('Т', 'T').replace('с', 'c').replace('а', 'a');
-    return `${route}: ${min.time}`;
+    let time = min.time.replace('D', 'Delay');
+    time = ~['A','D','-'].indexOf(min.time) ? time : `${time} min`;
+    return `${route}\n${time}`;
 }
 
 function now() {
@@ -331,6 +334,7 @@ function stopTitleText() {
         size: new Vector2(144, SCHEDULE_START_POS_Y),
         font: 'gothic-18-bold',
         color: 'black',
+        textAlign: 'left',
         textOverflow: 'ellipsis'
     });
 }
@@ -347,11 +351,21 @@ function scheduleInfoText(yPos, fontSize, elementSize, bold) {
 
 function notifyInfoText() {
     return new UI.Text({
-        position: new Vector2(0, 50),
-        size: new Vector2(144, 128),
+        position: new Vector2(0, 40),
+        size: new Vector2(144, 100),
         font: 'bitham-42-bold',
         color: 'black',
         textAlign: 'center'
+    });
+}
+
+function notifyInfoBackgroundRect() {
+    return new UI.Rect({
+        position: new Vector2(2, 40),
+        size: new Vector2(140, 100),
+        borderWidth: 3,
+        backgroundColor: 'white',
+        borderColor: 'black'
     });
 }
 
