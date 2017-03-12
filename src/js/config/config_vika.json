@@ -29,6 +29,11 @@
       "id": 2494,
       "name": "Академгородок",
       "description": "A64,A25,A145"
+    },
+    {
+      "id": 9481,
+      "name": "9-я больница",
+      "description": "T31,T47"
     }
   ],
   "api": {
@@ -38,7 +43,7 @@
   },
   "updateInterval": 15000,
   "updateIntervalOnFail": 5000,
-  "maxDistance": 500,
+  "maxDistance": 1000,
   "maxRetry": 5,
   "notificationFadeTimeout": 7000
 }

@@ -36,9 +36,9 @@
       "description": "->ст.м. Пушкинская"
     },
     {
-      "id": 56726,
-      "name": "ул. Пинская",
-      "description": "->ст.м. Молодежная"
+      "id": 46179,
+      "name": "ул. Гусовского",
+      "description": "Т7,Т9"
     },
     {
       "id": 46208,
@@ -46,9 +46,19 @@
       "description": "Т7,Т9"
     },
     {
+      "id": 62251,
+      "name": "Силикатный пер.",
+      "description": "A28,A50c,T31"
+    },
+    {
       "id": 46084,
       "name": "ул. Одоевского",
       "description": "Т4"
+    },
+    {
+      "id": 56746,
+      "name": "ст.м. Спортивная",
+      "description": "Т13,T44,A50c,A163"
     }
   ],
   "api": {
@@ -58,7 +68,7 @@
   },
   "updateInterval": 15000,
   "updateIntervalOnFail": 5000,
-  "maxDistance": 500,
+  "maxDistance": 1000,
   "maxRetry": 5,
   "notificationFadeTimeout": 7000
 }
